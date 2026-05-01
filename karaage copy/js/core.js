@@ -1,12 +1,67 @@
 /* ===== Core Application ===== */
+
+/**
+ * セクション定義: html/ フォルダのパーシャルファイルと対応
+ * id       — <section> の id 属性 / サイドバーの data-tool 値
+ * file     — html/ 内のファイル名
+ * default  — 初期表示時に active にするかどうか
+ */
+const SECTIONS = [
+  { id: 'dashboard',    file: 'html/dashboard.html',    default: true },
+  { id: 'proposal',     file: 'html/proposal.html' },
+  { id: 'requirements', file: 'html/requirements.html' },
+  { id: 'architecture', file: 'html/architecture.html' },
+  { id: 'uml',          file: 'html/uml.html' },
+  { id: 'layout',       file: 'html/layout.html' },
+  { id: 'erdiagram',    file: 'html/erdiagram.html' },
+  { id: 'gantt',        file: 'html/gantt.html' },
+];
+
 class App {
   constructor() {
     this.currentTool = 'dashboard';
+  }
+
+  /**
+   * HTMLパーシャルを読み込んでから各機能を初期化する
+   */
+  async init() {
+    await this.loadSections();
     this.initNav();
     this.initDashboard();
     this.proposal = new ProposalTool();
     this.requirements = new RequirementsTool();
   }
+
+  /**
+   * html/ フォルダのパーシャルファイルを fetch し、
+   * <main> 内に <section> として挿入する
+   */
+  async loadSections() {
+    const main = document.getElementById('main-content');
+    const results = await Promise.all(
+      SECTIONS.map(async (sec) => {
+        try {
+          const res = await fetch(sec.file);
+          if (!res.ok) throw new Error(`${sec.file}: ${res.status}`);
+          const html = await res.text();
+          return { ...sec, html };
+        } catch (err) {
+          console.error(`[loadSections] Failed to load ${sec.file}:`, err);
+          return { ...sec, html: `<p style="color:var(--danger);">セクションの読み込みに失敗しました</p>` };
+        }
+      })
+    );
+
+    results.forEach((sec) => {
+      const section = document.createElement('section');
+      section.id = sec.id;
+      section.className = 'tool-section' + (sec.default ? ' active' : '');
+      section.innerHTML = sec.html;
+      main.appendChild(section);
+    });
+  }
+
   initNav() {
     document.querySelectorAll('.sidebar nav a').forEach(a => {
       a.addEventListener('click', () => {
@@ -78,9 +133,12 @@ function showModal(title, bodyHtml, onConfirm) {
 }
 
 // --- Hamburger menu toggle (mobile) ---
-document.addEventListener('DOMContentLoaded', () => {
-  // instantiate app
-  if (!window.app) window.app = new App();
+document.addEventListener('DOMContentLoaded', async () => {
+  // instantiate app & load HTML partials
+  if (!window.app) {
+    window.app = new App();
+    await window.app.init();
+  }
 
   const ham = document.getElementById('hamburger');
   const overlay = document.getElementById('menu-overlay');
